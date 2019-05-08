@@ -1,0 +1,191 @@
+---
+title: "SFD_RHW"
+author: "SFD"
+date: "May 10, 2019"
+output:
+  html_document:
+    df_print: paged
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+## R Markdown
+Assignment:
+The dataset for this assignment includes research budgets for federal research and development agencies. The dataset comes from the American Association for the Advancement of Science Historical Trends. Examine the data for patterns and trends and share them in a report such as you might give to your advisor.
+Your report should:
+  Contain plots that illustrate relationships between variables and cases where relationships do not exist.
+  Contain plots with data divided by category as needed.
+  Include captions and descriptions of plots.
+  Show only informative output (not code or raw results).
+  Format text and results appropriately including headers and inline code.
+  For 539 students: Include R-squared and p-values from relevant statistical tests as necessary to
+  support relationships. These should be written in inline code not output as raw results or using
+  hardcoded numbers.
+
+```{r library, echo=TRUE, message=FALSE, warning=FALSE, paged.print=FALSE}
+library(tidyverse)
+library(ggplot2)
+library(reshape2)
+library(dbplyr)
+
+```
+
+```{r files, echo = TRUE}
+
+fed_spend <- read.csv("fed_r_d_spending.csv")
+energy_spend <- read.csv("energy_spending.csv")
+climate_spend <- read.csv("climate_spending.csv")
+
+attach(fed_spend)
+
+```
+
+The first dataset contains the R&D budget, total Federal spending, total discretionary Federal spending, and total US Gross Domestic Product (adjusted for inflation) for the following U.S. Government Departments: 
+  DOD - Department of Defense, 
+  NASA - National Aeronautics and Space Administration, 
+  DOE - Department of Energy, 
+  HHS - Department of Health and Human Services, 
+  NIH - National Institute of Health, 
+  NSF - National Science Foundation, 
+  USDA - US Department of Agriculture, 
+  Interior - Department of Interior, 
+  DOT - Department of Transportation, 
+  EPA - Environmental Protection Agency, 
+  DOC - Department of Corrections, 
+  DHS - Department of Homeland Security, 
+  VA - Department of Veterans Affairs, and 
+  Other - other research and development spending.
+  
+
+A quick plot of the discretionary outlays and total outlays revealed that they are the same over all departments every year.
+
+```{r fed_spend, echo=FALSE, fig.align='center'}
+
+ggplot(fed_spend, aes(year, discretionary_outlays, color=department))+
+  geom_boxplot()+
+    scale_color_discrete(name="Department")+
+  labs(title="Discretionary Outlays by Department")+
+  xlab("Year")+
+  ylab("Total ($)")
+
+ggplot(fed_spend, aes(year, total_outlays, color=department))+
+  geom_boxplot()+
+    scale_color_discrete(name="Department")+
+  labs(title="Total Outlays by Department")+
+  xlab("Year")+
+  ylab("Total ($)")
+
+```
+
+This is not necessarily helpful for comparision; however, when the two values are plotted as a line (total outlays in blue and disretionary outlays in red), it is clear how both budgets have generally increased over time.
+
+```{r OutlayCompare, echo=FALSE, fig.align='center'}
+DOD_spend <- subset(fed_spend, department=="DOD")
+
+ggplot(fed_spend, aes(year))+
+  geom_line(aes(y=total_outlays), color="blue")+
+  geom_line(aes(y=discretionary_outlays), color="red")+
+  scale_color_discrete(name="Budgets")+
+  labs(title="Outlays Over Time")+
+  xlab("Year")+
+  ylab("Total Spending ($)")
+
+```
+
+
+Variation is visible when the R&D budgets are plotted.
+
+
+```{r RDcompare, echo=FALSE, fig.align='center'}
+
+ggplot(fed_spend, aes(x=year, y=rd_budget, color=department))+
+  geom_line()+
+  scale_color_discrete(name="Department")+
+  labs(title="R&D Budgets by Department")+
+  xlab("Year")+
+  ylab("R&D Budget ($)")
+```
+
+The graph clearly indicates the the Deparment of Defense has commanded the largest Research and Development budget over time. Even though the budget seems to be declining in recent years, the DOD R&D budget is still far larger than all other reviewed departments. 
+
+Below is a linear regression of the R&D budget for DOD, displayed with the R-squared value, p-value, slope and intercept.
+
+```{r DODlm, echo=FALSE, fig.align='center'}
+fit1 <- lm(year~rd_budget, data = DOD_spend)
+summary(fit1)
+
+ggplot(DOD_spend, aes(year, rd_budget))+
+  geom_line()+
+  geom_smooth(method = "lm")+
+  labs(title = paste("Adj R2 = ",signif(summary(fit1)$adj.r.squared, 5),"Intercept =",signif(fit1$coef[[1]],5 ),
+  " Slope=",signif(fit1$coef[[2]], 5),
+  " P =",signif(summary(fit1)$coef[2,4], 5)))+
+  ylab("R&D Budget")+
+  xlab("Year")
+
+
+
+```
+
+Continuing our analysis of DOD spending. Below shows the budgets associated with DOD. the R&D budget (green) and the discretionary budget (red) are clearly only a portion of the total DOD budget (blue). 
+
+```{r DODAnalysis, echo=FALSE, fig.align='center'}
+
+ggplot(DOD_spend, aes(year))+
+  geom_line(aes(y=rd_budget), color = "green")+
+  geom_line(aes(y=total_outlays), color="blue")+
+  geom_line(aes(y=discretionary_outlays), color="red")+
+  scale_color_discrete(name="Budgets")+
+  labs(title="DOD Over Time")+
+  xlab("Year")+
+  ylab("Total Spending ($)")
+
+```
+
+
+The second dataset dealt with climate change spending. Certain departments overlapped with the Federal spending dataset. One of these department is NASA. To more easily look at the data, the two datasets were subset and merged. As seen below, the global climate change spending (gcc_spending) column has been appended to the end of the dataset. Note, the gcc data was only available from the year 2000.  
+
+
+```{r NASACombine, echo=FALSE}
+detach(fed_spend)
+attach(climate_spend)
+NASA_spend <- subset(fed_spend, department=="NASA")
+NASA_climate <- subset(climate_spend, climate_spend$department=="NASA") 
+
+MergedNASA <- merge(NASA_spend, NASA_climate)
+head(MergedNASA)
+
+
+```
+
+Plotting NASA's spending shows that a very small amount of their total budget is spent on R&D and climate change (orange).
+
+```{r NASAAnalysis, echo=FALSE, fig.align='center'}
+
+ggplot(MergedNASA, aes(year))+
+  geom_line(aes(y=rd_budget), color = "green")+
+  geom_line(aes(y=total_outlays), color="blue")+
+  geom_line(aes(y=discretionary_outlays), color="red")+
+  geom_line(aes(y=gcc_spending), color = "orange")+
+  scale_color_discrete(name="Budgets")+
+  labs(title="NASA budgets")+
+  xlab("Year")+
+  ylab("Total Spending ($)")
+
+```
+
+
+
+
+
+
+
+
+
+
+
+
+
